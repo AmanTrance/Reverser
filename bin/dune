@@ -1,0 +1,5 @@
+(executable
+ (public_name reverse_tcp)
+ (name main)
+ (modes exe byte)
+ (libraries reverse_tcp))

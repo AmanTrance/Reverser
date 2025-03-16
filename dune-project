@@ -19,7 +19,7 @@
  (name reverse_tcp)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml)
+ (depends (ocaml (>= 4.2.0)))
  (tags
   ("add topics" "to describe" your project)))
 

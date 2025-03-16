@@ -18,36 +18,44 @@ let handle_proxy (fd : Lwt_unix.file_descr) (ip : string) : (_ -> unit Lwt.t) =
   in
     let o_ic = Lwt_io.of_fd ~mode:Lwt_io.output fd
   in
-    fun _ -> begin 
-      let (p_ip, p_p) = get_pod_ip_based_on_client ip 
-      in
-        let p_s = Lwt_unix.socket ~cloexec:true Unix.PF_INET Unix.SOCK_STREAM 0 
-      in
-        let* () = Lwt_unix.connect p_s @@ pod_socket_addr p_ip p_p
-      in
-        let _ = Domain.spawn @@ fun _ -> begin
-          let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_s 
+    begin
+      fun _ -> begin 
+        let (p_ip, p_p) = get_pod_ip_based_on_client ip 
         in
-          let rec h_pod () = begin
-            let* d = Lwt_io.read_line p_ic in
-              let* () = Lwt_io.write o_ic d 
+          let p_s = Lwt_unix.socket ~cloexec:true Unix.PF_INET Unix.SOCK_STREAM 0 
+        in
+          let* () = Lwt_unix.connect p_s @@ pod_socket_addr p_ip p_p
+        in
+          let _ = Domain.spawn @@ fun _ -> begin
+            let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_s 
+          in
+            let rec h_pod () = begin
+              let () = Printf.printf "haha"; flush stdout 
             in
-              h_pod ()  
+              let* d = Lwt_io.read ~count:10 p_ic in
+                let* () = Lwt_io.write o_ic d 
+              in
+                h_pod ()  
+            end
+          in
+            h_pod ()
           end
         in
-          h_pod ()
-        end
-      in
-        let p_oc = Lwt_io.of_fd ~mode:Lwt_io.output p_s
-      in  
-        let rec h_cl () = begin
-          let* d = Lwt_io.read_line c_ic 
+          let p_oc = Lwt_io.of_fd ~mode:Lwt_io.output p_s
+        in  
+          let rec h_cl () = begin
+            let* d = Lwt_io.read ~count:10 c_ic 
+          in
+            let () = Printf.printf "%s\n" "hello"; flush stdout
+          in
+            let* () = Lwt_io.write p_oc d 
+          in
+            h_cl ()
+          end
         in
-          let* () = Lwt_io.write p_oc d 
+          let* () = h_cl ()
         in
-          h_cl ()
-        end
-      in
-        h_cl ()
-    end;; 
+          Lwt.return () 
+      end
+  end;; 
   

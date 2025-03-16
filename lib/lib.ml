@@ -21,15 +21,20 @@ let bind_and_listen (h : string) (p : int) : Lwt_unix.file_descr Lwt.t =
 let accept_and_serve (h : string) (p : int) =
   let* s = bind_and_listen h p 
   in
-    let* (_, a) = Lwt_unix.accept ~cloexec:true s 
-  in
-    let* () = match a with
-      | Unix.ADDR_INET (ip, port) -> Lwt.return @@ Printf.printf "IP -> %s:%d" (Unix.string_of_inet_addr ip) @@ port 
-      | _ -> raise Exit
-  in
-    let _ = Domain.spawn @@ fun _ -> Lwt.return ()
-  in
-    Lwt.return ();;
+    let rec accepter () =
+      let* (fd, a) = Lwt_unix.accept ~cloexec:true s 
+    in
+      let (_, _) = match a with
+        | Unix.ADDR_INET (ip, port) -> (ip, port) 
+        | _ -> raise Exit
+    in
+      let d = Domain.spawn @@ Client.handle_proxy fd "192.168.1.6" 
+    in
+      let* () = Domain.join d 
+    in
+      accepter ()
+    in
+      accepter ();;
 
                   
 

@@ -12,50 +12,65 @@ let pod_socket_addr (i : string) (p : int) =
   addr
 ;;
 
-let get_pod_ip_based_on_client (_c_ip : string) : string * int = "192.168.1.8", 22
+let get_pod_ip_based_on_client (t : (string, string) Hashtbl.t) (c_ip : string)
+  : string * int
+  =
+  let v : string = Hashtbl.find t c_ip in
+  let s : string list = String.split_on_char ':' v in
+  match s with
+  | [] -> raise Not_found
+  | i :: [] -> i, 22
+  | [ i; p ] -> i, int_of_string p
+  | _ -> raise Not_found
+;;
 
-let handle_proxy (fd : Lwt_unix.file_descr) (ip : string) : unit -> unit Lwt.t =
+let handle_proxy
+      (t : (string, string) Hashtbl.t)
+      (c_fd : Lwt_unix.file_descr)
+      (ip : string)
+  : unit -> unit Lwt.t
+  =
   let conn : bool ref = ref true in
-  let c_ic = Lwt_io.of_fd ~mode:Lwt_io.input fd in
-  let c_oc = Lwt_io.of_fd ~mode:Lwt_io.output fd in
+  let c_ic = Lwt_io.of_fd ~mode:Lwt_io.input c_fd in
+  let c_oc = Lwt_io.of_fd ~mode:Lwt_io.output c_fd in
   fun _ ->
-    let p_ip, p_p = get_pod_ip_based_on_client ip in
-    let p_s = Lwt_unix.socket ~cloexec:true Unix.PF_INET Unix.SOCK_STREAM 0 in
-    let* () = Lwt_unix.connect p_s @@ pod_socket_addr p_ip p_p in
-    let _ =
-      Lwt_preemptive.run_in_main_dont_wait
-        (fun () ->
-           let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_s in
-           let rec h_pod () =
-             let* d = Lwt_io.read ~count:64 p_ic in
-             if Bytes.length @@ Bytes.of_string @@ d == 0
-             then
-               if !conn
-               then Lwt.return ()
-               else
+    try
+      let p_ip, p_p = get_pod_ip_based_on_client t ip in
+      let p_fd = Lwt_unix.socket ~cloexec:false Lwt_unix.PF_INET Lwt_unix.SOCK_STREAM 0 in
+      let* () = Lwt_unix.connect p_fd @@ pod_socket_addr p_ip p_p in
+      let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_fd in
+      let p_oc = Lwt_io.of_fd ~mode:Lwt_io.output p_fd in
+      let _ =
+        Lwt_preemptive.run_in_main_dont_wait
+          (fun () ->
+             let rec h_pod () =
+               let* d = Lwt_io.read ~count:65535 p_ic in
+               if Bytes.length @@ Bytes.of_string @@ d == 0
+               then
                  let* () = Lwt_io.close p_ic in
-                 Lwt.return (conn := false)
-             else
-               let* () = Lwt_io.write c_oc d in
-               h_pod ()
-           in
-           h_pod ())
-        (fun _ -> ())
-    in
-    let p_oc = Lwt_io.of_fd ~mode:Lwt_io.output p_s in
-    let rec h_cl () =
-      let* d = Lwt_io.read ~count:64 c_ic in
-      if Bytes.length @@ Bytes.of_string @@ d == 0
-      then
-        let* () = Lwt_io.close c_ic in
-        let* () = Lwt_io.close c_oc in
-        let* () = Lwt_unix.close fd in
-        let* () = Lwt_io.close p_oc in
-        let* () = Lwt_unix.close p_s in
-        if !conn then Lwt.return () else Lwt.return (conn := false)
-      else
-        let* () = Lwt_io.write p_oc d in
-        h_cl ()
-    in
-    h_cl ()
+                 let* () = Lwt_io.close p_oc in
+                 let* () = Lwt_unix.close c_fd in
+                 if !conn then Lwt.return () else Lwt.return (conn := false)
+               else
+                 let* () = Lwt_io.write c_oc d in
+                 h_pod ()
+             in
+             h_pod ())
+          (fun _ -> ())
+      in
+      let rec h_cl () : unit Lwt.t =
+        let* d : string = Lwt_io.read ~count:65535 c_ic in
+        if Bytes.length @@ Bytes.of_string @@ d == 0
+        then
+          let* () = Lwt_io.close c_ic in
+          let* () = Lwt_io.close c_oc in
+          let* () = Lwt_unix.close p_fd in
+          if !conn then Lwt.return () else Lwt.return (conn := false)
+        else
+          let* () = Lwt_io.write p_oc d in
+          h_cl ()
+      in
+      h_cl ()
+    with
+    | _ -> Lwt.return ()
 ;;

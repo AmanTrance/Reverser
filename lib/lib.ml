@@ -19,10 +19,10 @@ let bind_and_listen (h : string) (p : int) : Lwt_unix.file_descr Lwt.t =
   Lwt.return socket
 ;;
 
-let accept_and_serve (h : string) (p : int) =
+let accept_and_serve (h : string) (p : int) (t : (string, string) Hashtbl.t) : unit Lwt.t =
   let* s = bind_and_listen h p in
   let rec accepter () =
-    let* fd, a = Lwt_unix.accept ~cloexec:true s in
+    let* fd, a = Lwt_unix.accept ~cloexec:false s in
     let i, _ =
       match a with
       | Unix.ADDR_INET (ip, port) -> ip, port
@@ -30,7 +30,7 @@ let accept_and_serve (h : string) (p : int) =
     in
     let _ =
       Lwt_preemptive.run_in_main_dont_wait
-        (Client.handle_proxy fd @@ Unix.string_of_inet_addr i)
+        (Client.handle_proxy t fd @@ Unix.string_of_inet_addr i)
         (fun _ -> ())
     in
     accepter ()

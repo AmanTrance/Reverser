@@ -1,3 +1,4 @@
 (library
  (name reverse_tcp)
+ (no_dynlink)
  (libraries lwt lwt.unix client))

@@ -1,0 +1,4 @@
+(env
+ (release
+  (ocamlopt_flags
+   (:standard -nodynlink -fno-PIC -O2 -ccopt -static))))

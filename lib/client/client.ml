@@ -12,7 +12,7 @@ let pod_socket_addr (i : string) (p : int) =
   addr
 ;;
 
-let get_pod_ip_based_on_client (c_ip : string) : string * int = c_ip, 22
+let get_pod_ip_based_on_client (_c_ip : string) : string * int = "192.168.1.8", 22
 
 let handle_proxy (fd : Lwt_unix.file_descr) (ip : string) : unit -> unit Lwt.t =
   let conn : bool ref = ref true in
@@ -23,22 +23,24 @@ let handle_proxy (fd : Lwt_unix.file_descr) (ip : string) : unit -> unit Lwt.t =
     let p_s = Lwt_unix.socket ~cloexec:true Unix.PF_INET Unix.SOCK_STREAM 0 in
     let* () = Lwt_unix.connect p_s @@ pod_socket_addr p_ip p_p in
     let _ =
-      Thread.create
-        Lwt_main.run
-        ((fun () ->
-            let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_s in
-            let rec h_pod () =
-              let* d = Lwt_io.read ~count:64 p_ic in
-              if Bytes.length @@ Bytes.of_string @@ d == 0
-              then if !conn then Lwt.return () else 
-                let* () = Lwt_io.close p_ic in
-                Lwt.return (conn := false)
-              else
-                let* () = Lwt_io.write c_oc d in
-                h_pod ()
-            in
-            h_pod ())
-           ())
+      Lwt_preemptive.run_in_main_dont_wait
+        (fun () ->
+           let p_ic = Lwt_io.of_fd ~mode:Lwt_io.input p_s in
+           let rec h_pod () =
+             let* d = Lwt_io.read ~count:64 p_ic in
+             if Bytes.length @@ Bytes.of_string @@ d == 0
+             then
+               if !conn
+               then Lwt.return ()
+               else
+                 let* () = Lwt_io.close p_ic in
+                 Lwt.return (conn := false)
+             else
+               let* () = Lwt_io.write c_oc d in
+               h_pod ()
+           in
+           h_pod ())
+        (fun _ -> ())
     in
     let p_oc = Lwt_io.of_fd ~mode:Lwt_io.output p_s in
     let rec h_cl () =

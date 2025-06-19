@@ -5,20 +5,16 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github AmanTrance/Reverser))
 
-(authors "Author Name <author@example.com>")
-
-(maintainers "Maintainer Name <maintainer@example.com>")
+(authors "Aman Kansal aman.hobo@gmail.com")
 
 (license LICENSE)
 
-(documentation https://url/to/documentation)
-
 (package
  (name reverse_tcp)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "Reverse SSH Based on Source IP")
+ (description "Reverse SSH Based on Source IP")
  (depends (ocaml (>= 4.2.0)))
  (tags
   ("add topics" "to describe" your project)))

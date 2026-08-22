@@ -8,8 +8,10 @@ tags: ["add topics" "to describe" "your" "project"]
 homepage: "https://github.com/AmanTrance/Reverser"
 bug-reports: "https://github.com/AmanTrance/Reverser/issues"
 depends: [
-  "dune" {>= "3.17"}
-  "ocaml" {>= "4.2.0"}
+  "dune" {>= "3.21"}
+  "base"
+  "lwt"
+  "toml"
   "odoc" {with-doc}
 ]
 build: [
@@ -27,3 +29,4 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/AmanTrance/Reverser.git"
+x-maintenance-intent: ["(latest)"]

@@ -1,4 +1,4 @@
-(lang dune 3.17)
+(lang dune 3.21)
 
 (name reverse_tcp)
 
@@ -15,7 +15,10 @@
  (name reverse_tcp)
  (synopsis "Reverse SSH Based on Source IP")
  (description "Reverse SSH Based on Source IP")
- (depends (ocaml (>= 4.2.0)))
+ (depends 
+   base
+   lwt
+   toml)
  (tags
   ("add topics" "to describe" your project)))
 
